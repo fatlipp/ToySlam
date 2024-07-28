@@ -1,6 +1,8 @@
 ## Simple SLAM Implementation
 This project is a basic implementation of SLAM using a simulated 2D LiDAR. The goal is to demonstrate the fundamental principles of SLAM, including robot pose estimation and optimization using virtual measurements.
 
+![SLAM](/assets/SLAM.png)
+
 ### Features
 - 2D LiDAR Simulation: A virtual LiDAR sensor is simulated, providing distance measurements to surrounding objects. This data is used to map the environment and estimate the robot's pose.
  - Robot Pose Optimization: The robot's pose (position and orientation) is optimized using virtual measurements, refining its estimated location over time.
