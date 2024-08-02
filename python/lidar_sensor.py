@@ -51,21 +51,19 @@ def hit_sphere(ray_orig, ray_dir, obj_center, radius):
 def calc_lidar_measurements(state_mat, environment, radius, lidar_fov, lidar_ray_step):
     """
     Inp:
-    * state_mat: 4x4 matrix
+    * state_3x3 matrix
     * environment: array of obstacles (circles)
     * radius - obstacle radius
     * lidar_fov - field of View, rad.
     * lidar_ray_step - angle between lidar beams, rad.
-
-    Note: a current implementation returns an obstacle pos, instead of a hit point (pt)
 
     return: list of detected ranges [(range, angle), ...] + [obstacle_id, ...]
     """
     landmarks = []
     landmark_ids = []
 
-    state_pos = state_mat[:3,3]
-    state_angle = state_mat_to_angle(state_mat)
+    state_pos = state_mat[:2,2]
+    state_angle = mat_to_angle_2d(state_mat[:2,:2])
 
     # left bound
     max_angle = state_angle + lidar_fov * 0.5
@@ -74,7 +72,7 @@ def calc_lidar_measurements(state_mat, environment, radius, lidar_fov, lidar_ray
 
     ray_count = int(lidar_fov / lidar_ray_step)
     for angle in np.linspace(min_angle, max_angle, num = ray_count):
-        dir = np.array([np.cos(angle), np.sin(angle), 0])
+        dir = np.array([np.cos(angle), np.sin(angle)])
 
         closest_p = None
         closest_d = 999999
@@ -91,18 +89,18 @@ def calc_lidar_measurements(state_mat, environment, radius, lidar_fov, lidar_ray
                 pt = state_pos + dir * dd
 
                 if closest_p is None:
-                    closest_p = point
-                    closest_d = np.linalg.norm(state_pos - point)
+                    closest_p = pt
+                    closest_d = np.linalg.norm(state_pos - pt)
                     closest_id = id
                 else:
-                    dist = np.linalg.norm(state_pos - point)
+                    dist = np.linalg.norm(state_pos - pt)
                     if dist < closest_d:
                         closest_p = point
                         closest_d = dist
                         closest_id = id
 
         if closest_p is not None:
-            d, a = convert_eucledian_to_radial_3d(closest_p, state_mat)
+            d, a = convert_eucledian_to_radial_2d(closest_p, state_mat)
             landmarks.append([d, a])
             landmark_ids.append(closest_id)
     
