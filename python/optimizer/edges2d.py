@@ -1,17 +1,26 @@
 import numpy as np
 
-from tools import mat_to_angle_2d, convert_radial_to_euclidean_2d
-
-class EdgeLandmark2d:
-    def __init__(self, pos_id, lm_id, measurement, information) -> None:
-        self.pos_id = pos_id
-        self.lm_id = lm_id
+from tools import mat_to_angle_2d
+class BaseEdge2:
+    def __init__(self, id_1, id_2, measurement, information) -> None:
+        self.id_1 = id_1
+        self.id_2 = id_2
         self.measurement = measurement
         self.information = information
+    
+    def get_type(self):
+        raise NotImplementedError("'get_type()' is not implemented")
 
+class EdgeLandmark2d(BaseEdge2):
+    def __init__(self, id_1, id_2, measurement, information) -> None:
+        super().__init__(id_1, id_2, measurement, information)
+
+    def get_type(self):
+        return 'se2point2'
+    
     def calc_error(self, graph):
-        pos = graph.positions[self.pos_id]
-        lm = graph.landmarks[self.lm_id]
+        pos = graph.vertices[self.id_1].position
+        lm = graph.vertices[self.id_2].position
 
         lm_local = [self.measurement[0] * np.cos(self.measurement[1]), 
                 self.measurement[0] * np.sin(self.measurement[1])]
@@ -38,16 +47,19 @@ class EdgeLandmark2d:
 
         return err, A, B
     
-class EdgeOdometry2d:
-    def __init__(self, pos_id_1, pos_id_2, measurement, information):
-        self.pos_id_1 = pos_id_1
-        self.pos_id_2 = pos_id_2
-        self.measurement = measurement
-        self.information = information
+    def get_id(self, index):
+        return self.id_1 if index == 0 else self.id_2
+    
+class EdgeOdometry2d(BaseEdge2):
+    def __init__(self, id_1, id_2, measurement, information) -> None:
+        super().__init__(id_1, id_2, measurement, information)
 
+    def get_type(self):
+        return 'se2'
+    
     def calc_error(self, graph):
-        pos_1 = graph.positions[self.pos_id_1]
-        pos_2 = graph.positions[self.pos_id_2]
+        pos_1 = graph.vertices[self.id_1].position
+        pos_2 = graph.vertices[self.id_2].position
         odom = self.measurement
 
         pp = np.linalg.inv(pos_1) @ pos_2
@@ -59,6 +71,9 @@ class EdgeOdometry2d:
         B = np.eye(3)        
 
         return err, A, B
+    
+    def get_id(self, index):
+        return self.id_1 if index == 0 else self.id_2
     
 # class EdgeVirtualLandmark2d:
 #     def __init__(self, pos_id_1, pos_id_2, lm_meas_1, lm_meas_2, information) -> None:

@@ -20,7 +20,8 @@ class GraphView2d:
         
         positions = []
 
-        for pos in graph.get_positions():
+        for pos_id in graph.get_positions():
+            pos = graph.get_pose(pos_id)
             trans = pos.position
             p = trans[:2,2]
             positions.append(p)
