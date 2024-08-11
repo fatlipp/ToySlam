@@ -8,9 +8,13 @@ from view.robot_view_2d import View, RobotStateView, FootprintView2d
 from view.graph_view_2d import GraphView2d
 from optimizer.graph_optimizer import GraphOptimizer
 from optimizer.opt_graph import OptGraph
+from optimizer.vertices import *
+from optimizer.edges2d import EdgeOdometry2d, EdgeLandmark2d
 from slam.graph2d import Graph2d
 from slam.slam_helper import add_to_graph, motion_model
 from tools import *
+
+from remote.graph_client import GraphClient
 
 np.random.seed(0)
 
@@ -20,18 +24,18 @@ np.random.seed(0)
 # Blue - Global Map
 
 # MAIN CONFIG IS HERE:
-POINT_SIZE = 33
+POINT_SIZE = 30
 
-ROBOT_STEPS = 100
-OPTIMIZATION_STEPS = 100
+ROBOT_STEPS = 120
+OPTIMIZATION_STEPS = 50
 LR = .2
 
 lidar_fov = np.deg2rad(120)
-lidar_ray_step = np.deg2rad(7) # decreas
+lidar_ray_step = np.deg2rad(12) # decreas
 
-lidar_std_ved = 0.15
+lidar_std_ved = .15
 position_std_dev = 0.75
-orientation_std_dev_deg = np.deg2rad(10.1)
+orientation_std_dev_deg = np.deg2rad(5.1)
 # END MAIN CONFIG
 
 # INF and NOISE matrices (dep on config)
@@ -85,7 +89,7 @@ landmarks_curr, ids_curr = \
 
 if landmarks_curr is None or ids_curr is None:
     exit(-1)
-pos_id = add_to_graph(graph, state_mat, landmarks_curr, ids_curr, LIDAR_NOISE)
+pos_id = add_to_graph(graph, state_mat, landmarks_curr, ids_curr, LIDAR_NOISE, True)
 
 robot_est.update_state(state_mat)
 robot_est.set_landmarks(landmarks_curr)
@@ -100,7 +104,7 @@ async def step():
     if pos_id < 10:
         state_transform_mat = np.eye(3, 3)
         state_transform_mat[:2,:2] = angle_to_mat_2d(np.deg2rad(3.))
-        state_transform_mat[:2, 2] = np.array([1.0, 0.0])
+        state_transform_mat[:2, 2] = np.array([2.0, 0.0])
     elif pos_id < 20:
         state_transform_mat = np.eye(3, 3)
         state_transform_mat[:2,:2] = angle_to_mat_2d(np.deg2rad(6.))
@@ -137,9 +141,10 @@ async def step():
                             + np.random.normal(0, ODOMETRY_NOISE[2,2]))
     RT[2, 2] = 1
 
-    state_mat = motion_model(state_mat, RT)
+    graph.get_pose(pos_id).set_odometry(RT)
 
-    pos_id = add_to_graph(graph, state_mat, landmarks_curr, ids_curr, LIDAR_NOISE, RT)
+    state_mat = motion_model(state_mat, RT)
+    pos_id = add_to_graph(graph, state_mat, landmarks_curr, ids_curr, LIDAR_NOISE, False)
 
     # 3. Vis
     robot_gt.update_state(state_mat_gt)
@@ -152,74 +157,93 @@ async def step():
 def construct_optimizer_graph(graph):
     graph_opt = OptGraph()
 
-    # lm map to dropout some lms
-    lm_count = 0
-    landmarks_map = {}
-
     positions = graph.get_positions()
     for i in range(len(positions)):
         pos = positions[i]
-        graph_opt.add_pose(pos.position, i == 0)
+        graph_opt.add_vertex(pos.id, VertexPose2d(pos.position), pos.is_fixed)
 
-        if i > 0 and pos.odometry is not None:
-            graph_opt.add_odometry_edge(i - 1, i, pos.odometry, ODOM_INF)
+    for i in range(len(positions)):
+        pos = positions[i]
+        if pos.odometry is not None:
+            graph_opt.add_edge(EdgeOdometry2d(pos.id, pos.id + 1, pos.odometry, ODOM_INF))
 
+    lm_id_glob = len(positions)
+    landmarks_id_map = {}
+    for i in range(len(positions)):
+        pos = positions[i]
         for lm_id in pos.landmark_measurements:
-            if lm_id not in landmarks_map:
-                landmarks_map[lm_id] = lm_count
-                lm_count += 1
-            graph_opt.add_landmark_edge(landmarks_map[lm_id], i,\
-                                        pos.landmark_measurements[lm_id], LIDAR_INF)
-
+            if lm_id not in landmarks_id_map:
+                landmarks_id_map[lm_id] = lm_id_glob
+                lm_id_glob += 1
+            graph_opt.add_edge(EdgeLandmark2d(pos.id, landmarks_id_map[lm_id],\
+                                        pos.landmark_measurements[lm_id], LIDAR_INF))
 
     landmarks = graph.get_landmarks()
     for lm_id in landmarks:
-        if lm_id not in landmarks_map:
+        if lm_id not in landmarks_id_map:
             continue
-        graph_opt.add_landmark(landmarks_map[lm_id], landmarks[lm_id], False)
+        graph_opt.add_vertex(landmarks_id_map[lm_id], Vertex2d(landmarks[lm_id]), False)
 
-    return graph_opt, landmarks_map
+    return graph_opt, landmarks_id_map
 
 def on_step(iter):
-    global graph_opt, landmarks_map
+    global graph_opt, landmarks_id_map
     
-    print("CB: ", iter)
-    update_graph(graph, graph_opt, landmarks_map)
+    # update_graph(graph, graph_opt, landmarks_id_map)
 
     return plt.fignum_exists(view.fig.number)
 
-def update_graph(graph, graph_opt, landmarks_map):
+def update_graph(graph, graph_opt, landmarks_id_map):
 
-    pos_count = len(graph.get_positions())
+    positions = graph.get_positions()
 
-    for i in range(pos_count):
-        graph.get_positions()[i].position = graph_opt.get_position(i)
+    for i in range(len(positions)):
+        pos = positions[i]
+        positions[i].position = graph_opt.get_vertex(pos.id).position
 
     for lm_id in graph.get_landmarks():
-        if lm_id not in landmarks_map:
+        if lm_id not in landmarks_id_map:
             continue
-        graph.get_landmarks()[lm_id] = graph_opt.get_landmark(landmarks_map[lm_id])
+        graph.get_landmarks()[lm_id] = graph_opt.get_vertex(landmarks_id_map[lm_id]).position
 
-
-    robot_est.update_state(graph.get_positions()[pos_count - 1].position)
+    robot_est.update_state(positions[len(positions) - 1].position)
 
     graph_view.update(graph)
 
     plt.pause(0.001)
 
-async def optimize(graph):
-    global graph_opt, landmarks_map
-    graph_opt = OptGraph()
-    graph_opt, landmarks_map = construct_optimizer_graph(graph)
-    optimizer = GraphOptimizer(graph_opt)
-    optimizer.set_on_step_cb(on_step)
-    optimizer.optimize(OPTIMIZATION_STEPS, LR)
+async def optimize(client, graph):
 
-    # update_graph(graph, graph_opt, landmarks_map)
+    global graph_opt, landmarks_id_map
+    graph_opt = OptGraph()
+    graph_opt, landmarks_id_map = construct_optimizer_graph(graph)
+
+    import time
+    t_start = time.time()
+    if client is None:
+        optimizer = GraphOptimizer(graph_opt)
+        optimizer.set_on_step_cb(on_step)
+        optimizer.optimize(OPTIMIZATION_STEPS, LR)
+    else:
+        graph_opt = await client.optimize(graph_opt)
+    t_end = time.time()
+    duration = t_end - t_start
+
+    print("OPT DURATION: ", duration)
+
+    update_graph(graph, graph_opt, landmarks_id_map)
 
 async def start_client(host, port):
     plt.ion()
     plt.show()
+
+    client = GraphClient(host, port)
+
+    try:
+        await client.connect()
+    except:
+        print("Cannot connect to server: ", host, port)
+        client = None
 
     optimized = False
 
@@ -228,10 +252,13 @@ async def start_client(host, port):
             await step()
         elif not optimized:
             optimized = True
-            await optimize(graph)
+            await optimize(client, graph)
         
         plt.pause(0.001)
         await asyncio.sleep(0.001)
+
+    if client is not None:
+        await client.close()
 
     
 # host, port = sys.argv[1], sys.argv[2]

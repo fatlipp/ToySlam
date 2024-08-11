@@ -1,0 +1,13 @@
+[requires]
+opencv/4.5.5
+eigen/3.4.0
+
+[options]
+opencv*:contrib=True
+opencv*:nonfree=True
+opencv*:shared=True
+eigen*:shared=True
+
+[generators]
+CMakeDeps
+CMakeToolchain
