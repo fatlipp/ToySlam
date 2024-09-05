@@ -1,0 +1,9 @@
+conan install . --output-folder=./build_release -s compiler.cppstd=gnu20 -s compiler.version=13 --build=missing
+cmake --preset conan-release -DWITH_CUDA=ON
+cmake --build --preset conan-release
+
+conan install . --output-folder=./build_debug -s compiler.cppstd=gnu20 -s compiler.version=13 --build=missing  --settings=build_type=Debug
+cmake --preset conan-debug -DWITH_CUDA=ON
+cmake --build --preset conan-debug
+
+compute-sanitizer --tool memcheck --leak-check full --track-unused-memory on ./bin/graph_optimizer 127.0.0.1 8888 cpu cuda

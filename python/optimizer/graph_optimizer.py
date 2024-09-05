@@ -62,9 +62,11 @@ class GraphOptimizer:
             t_start = time.time()
             # dx = np.linalg.lstsq(H_regularized, -self.b)[0]
             dx = solve(H_regularized, -self.b)
+
             dx *= lr
             t_end = time.time()
             duration_solve = t_end - t_start
+
 
             t_start = time.time()
             
@@ -98,10 +100,10 @@ class GraphOptimizer:
                 s_id += self.graph.vertices[v].get_dims()
             self.vertex_ids_map = vertex_ids_map
 
-            size = s_id
+            self.size = s_id
 
-            self.H = np.zeros((size, size))
-            self.b = np.zeros((size))
+        self.H = np.zeros((self.size, self.size))
+        self.b = np.zeros((self.size))
 
         delta = 1.5
         deltaSqr = delta**2
@@ -138,14 +140,17 @@ class GraphOptimizer:
             self.b[index2:index2 + BLOCK_SIZE_2] += B.T @ INF_W
             err += er
 
+            # print("lm id: {}-{}, errRobust: {}".format(
+            #     edge.id_1, edge.id_2, er))
+
         for v_id in self.graph.fixed_vertices:
             index = self.vertex_ids_map[v_id]
             STATE_SIZE = get_state_size(v_id, self.graph)
             self.H[index:index + STATE_SIZE, index:index + STATE_SIZE] += np.eye(STATE_SIZE) * 1e6
             self.b[index:index + STATE_SIZE] = np.zeros(STATE_SIZE)
 
-        # print("err: ", err)
-        # print("H: ", np.sum(H))
-        # print("b: ", np.sum(b))
+        print("err: ", err)
+        # print("H: ", np.sum(self.H))
+        # print("b: ", np.sum(self.b))
 
         return err

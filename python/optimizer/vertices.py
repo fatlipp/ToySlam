@@ -20,7 +20,7 @@ class VertexPose2d(BaseVertex):
         super().__init__(position)
 
     def get_type(self):
-        return 'pose2d'
+        return 0
 
     def get_dims(self):
         return 3
@@ -37,7 +37,7 @@ class Vertex2d(BaseVertex):
         super().__init__(position)
 
     def get_type(self):
-        return 'lm2d'
+        return 1
 
     def get_dims(self):
         return 2
