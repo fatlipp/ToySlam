@@ -5,11 +5,6 @@ def uint_to_bytes(value):
     return np.uint32(value).tobytes(order='C')
 def float_to_bytes(value):
     return np.float32(value).tobytes(order='C')
-def string_to_bytes(value):
-    b = bytearray()
-    b += uint_to_bytes(len(value))
-    b.extend(map(ord, value))
-    return b
 def matrix_to_bytearray(matrix, is_diag = False):
     if len(matrix.shape) == 0:
         return None
@@ -36,11 +31,11 @@ def matrix_to_bytearray(matrix, is_diag = False):
 
 def graph_to_bytes(graph):
     def matrix_to_bytearray_pos(type, matrix):
-        if type == 'pose2d':
+        if type == 0:
             return  float_to_bytes(matrix[0, 2]) +\
                     float_to_bytes(matrix[1, 2]) +\
                     float_to_bytes(mat_to_angle_2d(matrix[:2,:2]))
-        elif type == 'lm2d':
+        elif type == 1:
             return  float_to_bytes(matrix[0]) + float_to_bytes(matrix[1])
     
     total = b""
@@ -50,14 +45,14 @@ def graph_to_bytes(graph):
     for v_id in vertices:
         v = vertices[v_id]
         a = uint_to_bytes(v_id)
-        b = string_to_bytes(v.get_type())
+        b = uint_to_bytes(v.get_type())
         c = matrix_to_bytearray_pos(v.get_type(), v.position)
         total += a + b + c
 
     edges = graph.get_edges()
     total += uint_to_bytes(len(edges))
     for e in edges:
-        total += string_to_bytes(e.get_type())
+        total += uint_to_bytes(e.get_type())
         total += uint_to_bytes(e.id_1)
         total += uint_to_bytes(e.id_2)
         total += matrix_to_bytearray(e.measurement, False)

@@ -16,7 +16,7 @@ class EdgeLandmark2d(BaseEdge2):
         super().__init__(id_1, id_2, measurement, information)
 
     def get_type(self):
-        return 'se2point2'
+        return 1
     
     def calc_error(self, graph):
         pos = graph.vertices[self.id_1].position
@@ -24,8 +24,13 @@ class EdgeLandmark2d(BaseEdge2):
 
         lm_local = [self.measurement[0] * np.cos(self.measurement[1]), 
                 self.measurement[0] * np.sin(self.measurement[1])]
+
         pp = (np.linalg.inv(pos) @ np.array([lm[0], lm[1], 1]))[:2]
         err = pp - lm_local
+
+
+        # print("lm id: {}-{}, pp: {}, lm_local: {}".format(
+        #     self.id_1, self.id_2, pp, lm_local))
 
         x1, y1, th1 = pos[0, 2], pos[1, 2],  mat_to_angle_2d(pos[:2,:2])
         cosA = np.cos(th1)
@@ -55,7 +60,7 @@ class EdgeOdometry2d(BaseEdge2):
         super().__init__(id_1, id_2, measurement, information)
 
     def get_type(self):
-        return 'se2'
+        return 0
     
     def calc_error(self, graph):
         pos_1 = graph.vertices[self.id_1].position

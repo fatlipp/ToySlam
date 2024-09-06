@@ -24,18 +24,18 @@ np.random.seed(0)
 # Blue - Global Map
 
 # MAIN CONFIG IS HERE:
-POINT_SIZE = 30
+POINT_SIZE = 60
 
-ROBOT_STEPS = 120
-OPTIMIZATION_STEPS = 50
+ROBOT_STEPS = 50
+OPTIMIZATION_STEPS = 10
 LR = .2
 
 lidar_fov = np.deg2rad(120)
-lidar_ray_step = np.deg2rad(12) # decreas
+lidar_ray_step = np.deg2rad(6) # decreas
 
 lidar_std_ved = .15
-position_std_dev = 0.75
-orientation_std_dev_deg = np.deg2rad(5.1)
+position_std_dev = 0.5
+orientation_std_dev_deg = np.deg2rad(7.1)
 # END MAIN CONFIG
 
 # INF and NOISE matrices (dep on config)
@@ -230,6 +230,10 @@ async def optimize(client, graph):
     duration = t_end - t_start
 
     print("OPT DURATION: ", duration)
+
+    # optimizer = GraphOptimizer(graph_opt)
+    # optimizer.set_on_step_cb(on_step)
+    # optimizer.optimize(OPTIMIZATION_STEPS, LR)
 
     update_graph(graph, graph_opt, landmarks_id_map)
 
