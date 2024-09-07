@@ -73,8 +73,6 @@ __global__ void ProcessSe2s(const VertexStorageGpu<T>* vertices, EdgeGpuSe2<T>* 
         INF[4] *= err_J;
         INF[8] *= err_J;
 
-        atomicAdd(totalError, errRobust);
-
         const auto index1 = vertices->indexesInH[edges[c].id1];
         const auto index2 = vertices->indexesInH[edges[c].id2];
 
